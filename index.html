@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Map with Pins</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <!-- MarkerCluster CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Roboto', sans-serif;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100vw;
+        }
+
+        #coordinates {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 10px 15px;
+            border-radius: 8px;
+            z-index: 1000;
+            font-family: monospace;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            font-size: 14px;
+            backdrop-filter: blur(5px);
+        }
+
+        /* Menu Trigger and Categories Panel Styles */
+        .menu-trigger {
+            position: fixed;
+            bottom: 0;
+            right: 20px;
+            background: #4CAF50;
+            color: white;
+            width: 72px;
+            height: 72px;
+            border-radius: 16px 16px 0 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 1001;
+            box-shadow: 0 -4px 12px rgba(76, 175, 80, 0.2);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-size: 28px;
+        }
+
+        .menu-trigger:hover {
+            height: 80px;
+            background: #43a047;
+        }
+
+        .hover-menu {
+            position: fixed;
+            bottom: 72px;
+            right: 20px;
+            background: white;
+            padding: 24px;
+            border-radius: 20px 20px 0 0;
+            box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12);
+            z-index: 1000;
+            width: 360px;
+            max-height: calc(100vh - 180px);
+            overflow-y: auto;
+            transform: translateY(20px);
+            opacity: 0;
+            pointer-events: none;
+            visibility: hidden;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Create a safe hover area between menu trigger and hover menu */
+        .hover-menu::after {
+            content: '';
+            position: absolute;
+            bottom: -20px;
+            left: 0;
+            width: 100%;
+            height: 20px;
+            background: transparent;
+        }
+
+        .menu-trigger:hover + .hover-menu,
+        .hover-menu:hover {
+            transform: translateY(0);
+            opacity: 1;
+            pointer-events: all;
+            visibility: visible;
+        }
+
+        /* Add a connecting piece between menu and hover menu */
+        .hover-menu::before {
+            content: '';
+            position: absolute;
+            bottom: -72px;
+            right: 0;
+            width: 72px;
+            height: 72px;
+            background: #43a047;
+            z-index: -1;
+        }
+
+        .hover-menu-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .hover-menu::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .hover-menu::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 4px;
+        }
+
+        .hover-menu::-webkit-scrollbar-thumb {
+            background: rgba(76, 175, 80, 0.3);
+            border-radius: 4px;
+        }
+
+        .hover-menu::-webkit-scrollbar-thumb:hover {
+            background: rgba(76, 175, 80, 0.5);
+        }
+
+        .hover-menu-content h3 {
+            font-size: 24px;
+            font-weight: 500;
+            color: #1a1a1a;
+            margin-bottom: 20px;
+        }
+
+        .folder-item {
+            background: #f8f9fa;
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.2s ease;
+            border: 1px solid rgba(0, 0, 0, 0.06);
+        }
+
+        .folder-item:hover {
+            background: #f0f2f5;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        .folder-color {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            border: 2px solid white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            flex-shrink: 0;
+        }
+
+        .folder-name {
+            flex-grow: 1;
+            font-size: 15px;
+            font-weight: 500;
+            color: #2c2c2c;
+        }
+
+        .folder-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .folder-actions input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            margin: 0;
+            cursor: pointer;
+            border-radius: 4px;
+            border: 2px solid #4CAF50;
+            appearance: none;
+            -webkit-appearance: none;
+            position: relative;
+            transition: all 0.2s ease;
+        }
+
+        .folder-actions input[type="checkbox"]:checked {
+            background-color: #4CAF50;
+        }
+
+        .folder-actions input[type="checkbox"]:checked::after {
+            content: '✓';
+            position: absolute;
+            color: white;
+            font-size: 12px;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .action-btn {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 60px;
+            height: 32px;
+        }
+
+        .action-btn.edit-btn {
+            background: #f0f2f5;
+            color: #2c2c2c;
+        }
+
+        .action-btn.edit-btn:hover {
+            background: #e4e6e9;
+        }
+
+        .action-btn.export-btn {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .action-btn.export-btn:hover {
+            background: #43a047;
+        }
+
+        .action-btn.delete-btn {
+            background: #ef5350;
+            color: white;
+        }
+
+        .action-btn.delete-btn:hover {
+            background: #e53935;
+        }
+
+        .new-category-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 20px;
+            width: 100%;
+            justify-content: center;
+        }
+
+        .new-category-btn:hover {
+            background: #43a047;
+            transform: translateY(-1px);
+        }
+
+        .new-category-btn::before {
+            content: '+';
+            font-size: 18px;
+            font-weight: 400;
+        }
+
+        .pin-form, .folder-form, .edit-pin-form {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+            z-index: 1002;
+            display: none;
+            width: 350px;
+            backdrop-filter: blur(10px);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #666;
+        }
+
+        input[type="text"],
+        input[type="color"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        input[type="color"] {
+            height: 40px;
+            padding: 2px;
+        }
+
+        .form-group textarea {
+            resize: none;
+        }
+
+        /* Color input visibility control */
+        .form-group.color-input {
+            display: none;
+        }
+
+        .form-group.color-input.show {
+            display: block;
+        }
+
+        /* Checklist Styles */
+        .checkbox-list {
+            margin-top: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+            padding: 8px;
+            background: white;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            transition: all 0.2s ease;
+        }
+
+        .checkbox-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .checkbox-item:hover {
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #4CAF50;
+            border-radius: 4px;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s ease;
+        }
+
+        .checkbox-item input[type="checkbox"]:checked {
+            background-color: #4CAF50;
+            border-color: #4CAF50;
+        }
+
+        .checkbox-item input[type="checkbox"]:checked::after {
+            content: '✓';
+            position: absolute;
+            color: white;
+            font-size: 14px;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .checkbox-item input[type="text"] {
+            flex: 1;
+            border: none;
+            padding: 6px 10px;
+            font-size: 14px;
+            background: transparent;
+            color: #333;
+        }
+
+        .checkbox-item input[type="text"]:focus {
+            outline: none;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+
+        .checkbox-item button {
+            background: transparent;
+            border: none;
+            color: #dc3545;
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.2s ease;
+            padding: 0;
+        }
+
+        .checkbox-item button:hover {
+            background: #ffebee;
+        }
+
+        /* Add checklist button style */
+        .add-checklist-btn {
+            background: #e8f5e9;
+            color: #4CAF50;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.2s ease;
+            margin-bottom: 10px;
+        }
+
+        .add-checklist-btn:hover {
+            background: #c8e6c9;
+        }
+
+        .add-checklist-btn::before {
+            content: '+';
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+
+        .button-group button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .save-btn {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .save-btn:hover {
+            background: #45a049;
+        }
+
+        .cancel-btn {
+            background: #ff4444;
+            color: white;
+        }
+
+        .cancel-btn:hover {
+            background: #cc0000;
+        }
+
+        .delete-btn {
+            background: #dc3545;
+            color: white;
+        }
+
+        .delete-btn:hover {
+            background: #c82333;
+        }
+
+        .custom-dialog {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+            z-index: 1002;
+            width: 350px;
+            backdrop-filter: blur(10px);
+        }
+
+        .custom-dialog h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .custom-dialog p {
+            margin-bottom: 20px;
+            color: #666;
+        }
+
+        /* Add overlay when dialog is shown */
+        .dialog-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(2px);
+            z-index: 1001;
+            display: none;
+        }
+
+        /* Custom cluster styles */
+        .marker-cluster {
+            background-clip: padding-box;
+            border-radius: 20px;
+            background-color: rgba(76, 175, 80, 0.2);
+        }
+        
+        .marker-cluster div {
+            width: 30px;
+            height: 30px;
+            margin-left: 5px;
+            margin-top: 5px;
+            text-align: center;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: 600;
+            background-color: rgba(76, 175, 80, 0.8);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .marker-cluster-small {
+            background-color: rgba(76, 175, 80, 0.2);
+        }
+        .marker-cluster-small div {
+            background-color: rgba(76, 175, 80, 0.8);
+        }
+
+        .marker-cluster-medium {
+            background-color: rgba(241, 196, 15, 0.2);
+        }
+        .marker-cluster-medium div {
+            background-color: rgba(241, 196, 15, 0.8);
+        }
+
+        .marker-cluster-large {
+            background-color: rgba(231, 76, 60, 0.2);
+        }
+        .marker-cluster-large div {
+            background-color: rgba(231, 76, 60, 0.8);
+        }
+
+        /* Command Line Interface Styles */
+        .command-prompt {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px 15px;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 600px;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .command-input-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .command-prefix {
+            color: #4CAF50;
+            font-family: monospace;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .command-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: white;
+            font-family: monospace;
+            font-size: 16px;
+            padding: 5px;
+            outline: none;
+        }
+
+        .command-input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .command-history {
+            margin-top: 10px;
+            max-height: 150px;
+            overflow-y: auto;
+            color: #ccc;
+            font-family: monospace;
+            font-size: 14px;
+        }
+
+        .command-history::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .command-history::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .command-history::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+        }
+
+        /* Drag and Drop Styles */
+        .drag-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(76, 175, 80, 0.2);
+            z-index: 9999;
+            pointer-events: none;
+            backdrop-filter: blur(2px);
+        }
+
+        .drag-overlay::after {
+            content: 'Drop JSON file to import category';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px 30px;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 500;
+            color: #4CAF50;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        body.dragging .drag-overlay {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="drag-overlay"></div>
+    <div id="map"></div>
+    <div id="coordinates">Coordinates: [0.000000, 0.000000]</div>
+    
+    <!-- Command Line Interface -->
+    <div id="commandPrompt" class="command-prompt" style="display: none;">
+        <div class="command-input-container">
+            <span class="command-prefix">&gt;</span>
+            <input type="text" id="commandInput" class="command-input" placeholder="Enter command...">
+        </div>
+        <div id="commandHistory" class="command-history"></div>
+    </div>
+
+    <div class="menu-trigger">☰</div>
+    <div class="hover-menu">
+        <div class="hover-menu-content">
+            <h3>Categories</h3>
+            <button class="new-category-btn" onclick="showNewFolderForm()">New Category</button>
+            <div id="folderList"></div>
+        </div>
+    </div>
+
+    <div class="pin-form" id="pinForm">
+        <h3>Add New Pin</h3>
+        <div class="form-group">
+            <label>Title</label>
+            <input type="text" id="pinTitle" placeholder="Enter title..." required>
+        </div>
+        <div class="form-group">
+            <label>Description</label>
+            <textarea id="pinDescription" placeholder="Enter description..." rows="4" style="resize: none;"></textarea>
+        </div>
+        <div class="form-group">
+            <label>Category</label>
+            <select id="pinCategory" onchange="toggleColorInput(this.value)">
+                <option value="">No Category</option>
+            </select>
+        </div>
+        <div class="form-group color-input" id="pinColorGroup">
+            <label>Pin Color</label>
+            <input type="color" id="pinColor" value="#4CAF50">
+        </div>
+        <div class="form-group">
+            <label>Checklist</label>
+            <button onclick="addChecklistItem()" class="add-checklist-btn">Add Item</button>
+            <div id="pinChecklist" class="checkbox-list"></div>
+        </div>
+        <div class="button-group">
+            <button onclick="cancelPin()" class="cancel-btn">Cancel</button>
+            <button onclick="savePin()" class="save-btn">Save Pin</button>
+        </div>
+    </div>
+
+    <div class="folder-form" id="folderForm">
+        <h3>Category</h3>
+        <div class="form-group">
+            <label>Name</label>
+            <input type="text" id="newFolderName" placeholder="Enter category name..." required>
+        </div>
+        <div class="form-group">
+            <label>Color</label>
+            <input type="color" id="newFolderColor" value="#4CAF50">
+        </div>
+        <div class="button-group">
+            <button onclick="addFolder()" class="save-btn">Save</button>
+            <button onclick="hideNewFolderForm()" class="cancel-btn">Cancel</button>
+        </div>
+    </div>
+
+    <div class="edit-pin-form" id="editPinForm">
+        <h3>Edit Pin</h3>
+        <div class="form-group">
+            <label>Title</label>
+            <input type="text" id="editPinTitle" required>
+        </div>
+        <div class="form-group">
+            <label>Description</label>
+            <textarea id="editPinDescription" rows="4" style="resize: none;"></textarea>
+        </div>
+        <div class="form-group">
+            <label>Category</label>
+            <select id="editPinCategory" onchange="toggleColorInput(this.value, true)">
+                <option value="">No Category</option>
+            </select>
+        </div>
+        <div class="form-group color-input" id="editPinColorGroup">
+            <label>Pin Color</label>
+            <input type="color" id="editPinColor" value="#4CAF50">
+        </div>
+        <div class="form-group">
+            <label>Checklist</label>
+            <button onclick="addEditChecklistItem()" class="add-checklist-btn">Add Item</button>
+            <div id="editPinChecklist" class="checkbox-list"></div>
+        </div>
+        <div class="button-group">
+            <button onclick="updatePin()" class="save-btn">Update</button>
+            <button onclick="hideEditPinForm()" class="cancel-btn">Cancel</button>
+            <button onclick="deleteCurrentPin()" class="delete-btn">Delete</button>
+        </div>
+    </div>
+
+    <!-- Custom Confirmation Dialog -->
+    <div class="custom-dialog" id="confirmDialog" style="display: none;">
+        <h3>Confirm Action</h3>
+        <p id="confirmMessage"></p>
+        <div class="button-group">
+            <button onclick="handleConfirmAction(true)" class="save-btn">Confirm</button>
+            <button onclick="handleConfirmAction(false)" class="cancel-btn">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Edit Category Dialog -->
+    <div class="custom-dialog" id="editCategoryDialog" style="display: none;">
+        <h3>Edit Category</h3>
+        <div class="form-group">
+            <label>Name</label>
+            <input type="text" id="editCategoryName" placeholder="Enter category name..." required>
+        </div>
+        <div class="button-group">
+            <button onclick="handleEditCategory()" class="save-btn">Save</button>
+            <button onclick="hideEditCategoryDialog()" class="cancel-btn">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="map.js"></script>
+</body>
+</html>
