@@ -27,7 +27,7 @@ map.on('mousemove', function(e) {
 });
 
 // Create pin SVG icon template
-const createPinIcon = (color) => {
+const createPinIcon = (color, showIndicator = false) => {
     return `<svg width="24" height="36" viewBox="0 0 24 36" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M12 0C5.37 0 0 5.37 0 12c0 7.17 7.29 15.47 11.71 19.71.19.19.44.29.69.29s.5-.1.69-.29C17.71 27.47 24 19.17 24 12c0-6.63-5.37-12-12-12z" 
         fill="${color}"/>
@@ -35,6 +35,7 @@ const createPinIcon = (color) => {
         fill="white"/>
         <path d="M12 0C5.37 0 0 5.37 0 12c0 7.17 7.29 15.47 11.71 19.71.19.19.44.29.69.29s.5-.1.69-.29C17.71 27.47 24 19.17 24 12c0-6.63-5.37-12-12-12zm0 30.59c-3.82-3.82-10-10.71-10-18.59 0-5.51 4.49-10 10-10s10 4.49 10 10c0 7.88-6.18 14.77-10 18.59z" 
         fill="rgba(0,0,0,0.2)"/>
+        ${showIndicator ? '<div class="pin-measure-indicator"></div>' : ''}
     </svg>`;
 };
 
@@ -215,6 +216,28 @@ let nextMarkerId = 0;  // Counter for generating unique marker IDs
 let confirmCallback = null;
 let editingCategoryIndex = null;
 
+// Distance measurement variables
+let measureMode = false;
+let firstPin = null;
+let secondPin = null;  // Add second pin tracking
+let measureLine = null;
+let measureTooltip = null;
+
+// Add these variables at the top with other variables
+let currentPinImages = [];
+let currentEditPinImages = [];
+
+// Add these variables for image viewing
+let currentImageIndex = 0;
+let currentImageSet = [];
+let currentZoom = 1;
+let isDragging = false;
+let startPos = { x: 0, y: 0 };
+let currentPos = { x: 0, y: 0 };
+
+// Add this near the top of the file with other variable declarations
+let isMenuOpen = false;
+
 // Load saved data from localStorage
 function loadSavedData() {
     try {
@@ -224,7 +247,7 @@ function loadSavedData() {
         const savedPins = JSON.parse(localStorage.getItem('mapPins') || '[]');
         nextMarkerId = Math.max(0, ...savedPins.map(pin => pin.id || 0)) + 1;
         savedPins.forEach(pin => {
-            createMarker(pin.lat, pin.lng, pin.title, pin.description, pin.category, pin.customColor, pin.checklist, pin.id);
+            createMarker(pin.lat, pin.lng, pin.title, pin.description, pin.category, pin.customColor, pin.checklist, pin.images, pin.id);
         });
     } catch (error) {
         console.error('Error loading saved data:', error);
@@ -326,6 +349,7 @@ function exportCategoryPins(categoryIndex) {
             description: m.data.description,
             customColor: m.data.customColor,
             checklist: m.data.checklist,
+            images: m.data.images,
             category: {
                 name: category.name,
                 color: category.color
@@ -467,7 +491,7 @@ function setChecklistItems(checklistId, items) {
 }
 
 // Create a new marker
-function createMarker(lat, lng, title, description, categoryIndex, customColor, checklist = [], id = null) {
+function createMarker(lat, lng, title, description, categoryIndex, customColor, checklist = [], images = [], id = null) {
     const markerId = id !== null ? parseInt(id) : nextMarkerId++;
     const color = categoryIndex !== null ? categories[categoryIndex].color : (customColor || '#4CAF50');
     const categoryName = categoryIndex !== null ? categories[categoryIndex].name : 'No Category';
@@ -482,37 +506,8 @@ function createMarker(lat, lng, title, description, categoryIndex, customColor, 
     
     const marker = L.marker([lat, lng], { icon });
     
-    if (categoryIndex === null || categories[categoryIndex].visible) {
-        marker.addTo(map);
-    }
-    
-    // Create popup content with unique ID
-    const popupContent = document.createElement('div');
-    popupContent.className = 'pin-info';
-    popupContent.innerHTML = `
-        <h3>${title}</h3>
-        ${description ? `<p>${description}</p>` : ''}
-        <p><small>Category: ${categoryName}</small></p>
-        ${checklist.length ? `
-            <div class="checkbox-list">
-                ${checklist.map(item => `
-                    <div class="checkbox-item">
-                        <input type="checkbox" ${item.checked ? 'checked' : ''} onclick="updatePinChecklist(${markerId}, this)">
-                        <input type="text" value="${item.text}" readonly>
-                    </div>
-                `).join('')}
-            </div>
-        ` : ''}
-        <div class="button-group">
-            <button onclick="editPin(${markerId})" class="save-btn">Edit</button>
-            <button onclick="deletePin(${markerId})" class="delete-btn">Delete</button>
-        </div>
-    `;
-    
-    marker.bindPopup(popupContent);
-    
-    // Store marker data with ID
-    markers.push({
+    // Store marker data first
+    const markerData = {
         id: markerId,
         marker: marker,
         data: {
@@ -522,7 +517,39 @@ function createMarker(lat, lng, title, description, categoryIndex, customColor, 
             description: description,
             categoryIndex: categoryIndex,
             customColor: customColor,
-            checklist: checklist
+            checklist: checklist || [],
+            images: images || []
+        }
+    };
+    markers.push(markerData);
+    
+    // Add marker to map if category is visible
+    if (categoryIndex === null || categories[categoryIndex].visible) {
+        marker.addTo(map);
+    }
+    
+    // Handle marker clicks
+    marker.on('click', function(e) {
+        // Check if we're in measure mode
+        if (measureMode) {
+            if (handlePinClick(marker)) {
+                return;
+            }
+        }
+        
+        // Close any existing popups
+        map.closePopup();
+        
+        // Unbind any existing popup
+        marker.unbindPopup();
+        
+        // Create and show the popup
+        try {
+            const popup = createPopup(markerData);
+            marker.bindPopup(popup);
+            marker.openPopup();
+        } catch (error) {
+            console.error('Error creating popup:', error);
         }
     });
     
@@ -530,15 +557,168 @@ function createMarker(lat, lng, title, description, categoryIndex, customColor, 
     return markerId;
 }
 
-// Update pin checklist
-function updatePinChecklist(markerId, checkbox) {
-    markerId = parseInt(markerId);
-    const markerIndex = markers.findIndex(m => m.id === markerId);
-    if (markerIndex === -1) return;
+// Separate function to create popup content
+function createPopup(markerData) {
+    const { id, data } = markerData;
+    const categoryName = data.categoryIndex !== null ? categories[data.categoryIndex].name : 'No Category';
     
-    const itemIndex = Array.from(checkbox.closest('.checkbox-list').children).indexOf(checkbox.closest('.checkbox-item'));
-    markers[markerIndex].data.checklist[itemIndex].checked = checkbox.checked;
+    const popup = L.popup({
+        maxWidth: 300,
+        className: 'custom-popup',
+        closeOnClick: false  // Prevent popup from closing when clicking inside it
+    });
+    
+    const container = document.createElement('div');
+    container.className = 'pin-info';
+    
+    // Build the HTML content
+    let content = `
+        <h3>${escapeHtml(data.title)}</h3>
+        ${data.description ? `<p>${escapeHtml(data.description)}</p>` : ''}
+        <p><small>Category: ${escapeHtml(categoryName)}</small></p>
+    `;
+    
+    // Add images if they exist
+    if (data.images && data.images.length > 0) {
+        content += `
+            <div class="pin-images-popup">
+                ${data.images.map((img, index) => `
+                    <img src="${img}" 
+                         onclick="openImageViewer(${id}, ${index})"
+                         alt="Pin image ${index + 1}"
+                         style="width: 100px; height: 100px; object-fit: cover;">
+                `).join('')}
+            </div>
+        `;
+    }
+    
+    // Add checklist if it exists
+    if (data.checklist && data.checklist.length > 0) {
+        content += `
+            <div class="checkbox-list">
+                ${data.checklist.map((item, index) => `
+                    <div class="checkbox-item">
+                        <input type="checkbox" 
+                               ${item.checked ? 'checked' : ''} 
+                               onchange="updatePinChecklist(${id}, this, ${index})">
+                        <input type="text" value="${escapeHtml(item.text)}" readonly>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+    
+    // Add buttons
+    content += `
+        <div class="button-group">
+            <button onclick="editPin(${id})" class="save-btn">Edit</button>
+            <button onclick="deletePin(${id})" class="delete-btn">Delete</button>
+        </div>
+    `;
+    
+    container.innerHTML = content;
+    popup.setContent(container);
+    
+    return popup;
+}
+
+// Helper function to escape HTML
+function escapeHtml(unsafe) {
+    if (typeof unsafe !== 'string') return '';
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+// Update checklist item
+function updatePinChecklist(markerId, checkbox, itemIndex) {
+    const markerData = markers.find(m => m.id === markerId);
+    if (!markerData || !markerData.data.checklist) return;
+    
+    markerData.data.checklist[itemIndex].checked = checkbox.checked;
     saveToLocalStorage();
+}
+
+// Update the image viewer function
+function openImageViewer(markerId, imageIndex) {
+    const markerData = markers.find(m => m.id === markerId);
+    if (!markerData || !markerData.data.images || !markerData.data.images.length) {
+        console.error('No marker data or images found:', markerId);
+        return;
+    }
+    
+    const images = markerData.data.images;
+    
+    const modal = document.getElementById('imageModal');
+    const modalImg = document.getElementById('modalImage');
+    const counter = document.getElementById('imageCounter');
+    
+    // Show/hide navigation buttons
+    const prevBtn = modal.querySelector('.nav-prev');
+    const nextBtn = modal.querySelector('.nav-next');
+    prevBtn.style.display = images.length > 1 ? 'flex' : 'none';
+    nextBtn.style.display = images.length > 1 ? 'flex' : 'none';
+    
+    // Update counter
+    if (images.length > 1) {
+        counter.textContent = `${imageIndex + 1} / ${images.length}`;
+        counter.style.display = 'block';
+    } else {
+        counter.style.display = 'none';
+    }
+    
+    // Set current image
+    currentImageSet = images;
+    currentImageIndex = imageIndex;
+    
+    // Load image
+    modalImg.src = images[imageIndex];
+    modal.style.display = 'block';
+}
+
+// Update close modal function
+function closeImageModal() {
+    const modal = document.getElementById('imageModal');
+    modal.style.display = 'none';
+    
+    // Reset image viewer state
+    currentImageSet = [];
+    currentImageIndex = 0;
+    
+    // Reset modal image
+    const modalImg = document.getElementById('modalImage');
+    modalImg.src = '';
+    
+    // Reset zoom and position
+    currentZoom = 1;
+    currentPos = { x: 0, y: 0 };
+    modalImg.style.transform = 'none';
+    
+    // Remove any lingering event listeners
+    modalImg.onload = null;
+}
+
+// Save to localStorage with error handling
+function saveToLocalStorage() {
+    try {
+        const pinsData = markers.map(m => ({
+            id: m.id,
+            lat: m.data.lat,
+            lng: m.data.lng,
+            title: m.data.title,
+            description: m.data.description,
+            category: m.data.categoryIndex,
+            customColor: m.data.customColor,
+            checklist: m.data.checklist,
+            images: m.data.images
+        }));
+        localStorage.setItem('mapPins', JSON.stringify(pinsData));
+    } catch (error) {
+        console.error('Error saving to localStorage:', error);
+    }
 }
 
 // Edit pin
@@ -558,6 +738,33 @@ function editPin(markerId) {
     toggleColorInput(pin.categoryIndex !== null ? pin.categoryIndex.toString() : "", true);
     
     setChecklistItems('editPinChecklist', pin.checklist || []);
+    
+    // Set up images
+    currentEditPinImages = [...(pin.images || [])];
+    const previewContainer = document.getElementById('editPinImagePreview');
+    previewContainer.innerHTML = '';
+    currentEditPinImages.forEach(imageData => {
+        const previewItem = document.createElement('div');
+        previewItem.className = 'image-preview-item';
+        
+        const img = document.createElement('img');
+        img.src = imageData;
+        
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'remove-image';
+        removeBtn.innerHTML = '×';
+        removeBtn.onclick = function() {
+            const index = currentEditPinImages.indexOf(imageData);
+            if (index > -1) {
+                currentEditPinImages.splice(index, 1);
+            }
+            previewItem.remove();
+        };
+        
+        previewItem.appendChild(img);
+        previewItem.appendChild(removeBtn);
+        previewContainer.appendChild(previewItem);
+    });
     
     document.getElementById('editPinForm').style.display = 'block';
 }
@@ -598,6 +805,7 @@ function updatePin() {
             categoryIndex === "" ? null : parseInt(categoryIndex),
             categoryIndex === "" ? customColor : null,
             checklist,
+            currentEditPinImages,
             currentEditingPin
         );
         
@@ -618,6 +826,11 @@ function deletePin(markerId) {
 
 // Handle map click
 map.on('click', function(e) {
+    // Don't create pins in measure mode
+    if (measureMode) {
+        return;
+    }
+
     // Check if any popup is currently open
     const activePopup = document.querySelector('.leaflet-popup');
     if (activePopup) {
@@ -663,7 +876,8 @@ function savePin() {
             description, 
             categoryIndex === "" ? null : parseInt(categoryIndex), 
             categoryIndex === "" ? customColor : null,
-            checklist
+            checklist,
+            currentPinImages
         );
         
         // Clear form
@@ -672,6 +886,8 @@ function savePin() {
         document.getElementById('pinCategory').value = '';
         document.getElementById('pinColor').value = '#4CAF50';
         document.getElementById('pinChecklist').innerHTML = '';
+        document.getElementById('pinImagePreview').innerHTML = '';
+        currentPinImages = [];
         document.getElementById('pinForm').style.display = 'none';
     }
 }
@@ -688,6 +904,7 @@ function cancelPin() {
     document.getElementById('pinCategory').value = '';
     document.getElementById('pinColor').value = '#4CAF50';
     document.getElementById('pinChecklist').innerHTML = '';
+    document.getElementById('pinImagePreview').innerHTML = '';
     document.getElementById('pinForm').style.display = 'none';
 }
 
@@ -756,25 +973,6 @@ function deleteCurrentPin() {
     if (currentEditingPin !== null) {
         deletePin(currentEditingPin);
         hideEditPinForm();
-    }
-}
-
-// Save pins to localStorage
-function saveToLocalStorage() {
-    try {
-        const pinsData = markers.map(m => ({
-            id: m.id,
-            lat: m.data.lat,
-            lng: m.data.lng,
-            title: m.data.title,
-            description: m.data.description,
-            category: m.data.categoryIndex,
-            customColor: m.data.customColor,
-            checklist: m.data.checklist
-        }));
-        localStorage.setItem('mapPins', JSON.stringify(pinsData));
-    } catch (error) {
-        console.error('Error saving pins:', error);
     }
 }
 
@@ -852,6 +1050,16 @@ document.addEventListener('DOMContentLoaded', () => {
             execute: () => {
                 const center = map.getCenter();
                 addToHistory(`Current center: [${center.lat.toFixed(6)}, ${center.lng.toFixed(6)}]`);
+            }
+        },
+        'measure': {
+            description: 'Toggle distance measurement mode between pins',
+            execute: () => {
+                toggleMeasureMode();
+                addToHistory(`Measure mode ${measureMode ? 'enabled' : 'disabled'}`);
+                if (measureMode) {
+                    addToHistory('Click two pins to measure the distance between them');
+                }
             }
         }
     };
@@ -970,15 +1178,286 @@ document.addEventListener('drop', async (e) => {
                         pin.description,
                         categoryIndex,
                         null,
-                        pin.checklist || []
+                        pin.checklist || [],
+                        pin.images || []
                     );
                 });
                 
                 saveCategories();
                 saveToLocalStorage();
             }
-        } catch (error) {
+    } catch (error) {
             console.error('Error importing file:', error);
         }
     }
+});
+
+// Add measure mode toggle function
+function toggleMeasureMode() {
+    measureMode = !measureMode;
+    
+    // Reset measurement state
+    if (!measureMode) {
+        resetMeasurementPins();
+        if (measureLine) {
+            map.removeLayer(measureLine);
+            measureLine = null;
+        }
+        if (measureTooltip) {
+            map.removeLayer(measureTooltip);
+            measureTooltip = null;
+        }
+    }
+    
+    // Update cursor and interface
+    document.body.style.cursor = measureMode ? 'crosshair' : '';
+    document.getElementById('measureBtn').classList.toggle('active', measureMode);
+}
+
+// Reset measurement pins
+function resetMeasurementPins() {
+    if (firstPin) {
+        updatePinIcon(firstPin, false);
+        firstPin.setZIndexOffset(0);
+        firstPin = null;
+    }
+    if (secondPin) {
+        updatePinIcon(secondPin, false);
+        secondPin.setZIndexOffset(0);
+        secondPin = null;
+    }
+}
+
+// Update pin icon
+function updatePinIcon(marker, showIndicator) {
+    const markerData = markers.find(m => m.marker === marker);
+    if (markerData) {
+        const color = markerData.data.categoryIndex !== null ? 
+            categories[markerData.data.categoryIndex].color : 
+            (markerData.data.customColor || '#4CAF50');
+        
+        const icon = L.divIcon({
+            className: 'custom-pin',
+            html: createPinIcon(color, showIndicator),
+            iconSize: [24, 36],
+            iconAnchor: [12, 36],
+            popupAnchor: [0, -36]
+        });
+        
+        marker.setIcon(icon);
+    }
+}
+
+// Modify the marker click event to handle measurements
+function handlePinClick(marker) {
+    if (measureMode) {
+        if (!firstPin && !secondPin) {
+            // First pin selection
+            firstPin = marker;
+            updatePinIcon(marker, true);
+            marker.setZIndexOffset(1000);
+        } else if (firstPin === marker) {
+            // Clicking the first pin again - deselect it
+            updatePinIcon(marker, false);
+            marker.setZIndexOffset(0);
+            firstPin = null;
+            
+            // Remove measurement line and tooltip if they exist
+            if (measureLine) {
+                map.removeLayer(measureLine);
+                measureLine = null;
+            }
+            if (measureTooltip) {
+                map.removeLayer(measureTooltip);
+                measureTooltip = null;
+            }
+        } else if (secondPin === marker) {
+            // Clicking the second pin again - deselect it
+            updatePinIcon(marker, false);
+            marker.setZIndexOffset(0);
+            secondPin = null;
+            
+            // Remove measurement line and tooltip
+            if (measureLine) {
+                map.removeLayer(measureLine);
+                measureLine = null;
+            }
+            if (measureTooltip) {
+                map.removeLayer(measureTooltip);
+                measureTooltip = null;
+            }
+        } else if (!secondPin) {
+            // Selecting second pin
+            secondPin = marker;
+            updatePinIcon(marker, true);
+            marker.setZIndexOffset(1000);
+            updateMeasurementLine(firstPin, secondPin);
+        } else {
+            // Attempting to select a third pin - reset and start with this pin
+            resetMeasurementPins();
+            firstPin = marker;
+            updatePinIcon(marker, true);
+            marker.setZIndexOffset(1000);
+            
+            // Remove measurement line and tooltip
+            if (measureLine) {
+                map.removeLayer(measureLine);
+                measureLine = null;
+            }
+            if (measureTooltip) {
+                map.removeLayer(measureTooltip);
+                measureTooltip = null;
+            }
+        }
+        return true; // Prevent normal pin click behavior
+    }
+    return false; // Allow normal pin click behavior
+}
+
+// Calculate distance between two points
+function calculateDistance(latlng1, latlng2) {
+    // Calculate distance in meters
+    const meters = map.distance(latlng1, latlng2);
+    
+    // Convert to feet (1 meter = 3.28084 feet)
+    const feet = meters * 3.28084;
+    
+    // Convert to miles (1 mile = 5280 feet)
+    const miles = feet / 5280;
+    
+    return {
+        feet: Math.round(feet),
+        miles: miles.toFixed(2)
+    };
+}
+
+// Update or create measurement line
+function updateMeasurementLine(startPin, endPin) {
+    const start = startPin.getLatLng();
+    const end = endPin.getLatLng();
+    
+    // Create or update the line
+    if (!measureLine) {
+        measureLine = L.polyline([start, end], {
+            color: '#4CAF50',
+            weight: 3,
+            dashArray: '5, 10',
+            opacity: 0.8
+        }).addTo(map);
+    } else {
+        measureLine.setLatLngs([start, end]);
+    }
+    
+    // Calculate distance
+    const distance = calculateDistance(start, end);
+    
+    // Create or update the tooltip
+    const tooltipContent = `
+        <div class="measure-tooltip">
+            <strong>Distance:</strong><br>
+            ${distance.feet.toLocaleString()} ft<br>
+            ${distance.miles} mi
+        </div>
+    `;
+    
+    if (!measureTooltip) {
+        measureTooltip = L.tooltip({
+            permanent: true,
+            direction: 'top',
+            offset: [0, -10],
+            className: 'measure-tooltip-wrapper'
+        })
+        .setContent(tooltipContent)
+        .setLatLng([(start.lat + end.lat) / 2, (start.lng + end.lng) / 2])
+        .addTo(map);
+    } else {
+        measureTooltip.setContent(tooltipContent)
+            .setLatLng([(start.lat + end.lat) / 2, (start.lng + end.lng) / 2]);
+    }
+}
+
+// Update navigation function
+function navigateImages(direction) {
+    if (!currentImageSet || !currentImageSet.length) return;
+    
+    currentImageIndex = (currentImageIndex + direction + currentImageSet.length) % currentImageSet.length;
+    const modalImg = document.getElementById('modalImage');
+    const counter = document.getElementById('imageCounter');
+    
+    modalImg.src = currentImageSet[currentImageIndex];
+    counter.textContent = `${currentImageIndex + 1} / ${currentImageSet.length}`;
+}
+
+// Update image upload handling
+function handleImageUpload(files, previewContainerId, imageArray) {
+    const container = document.getElementById(previewContainerId);
+    const maxFileSize = 5 * 1024 * 1024; // 5MB limit
+    
+    Array.from(files).forEach(file => {
+        if (!file.type.startsWith('image/')) {
+            alert('Only image files are allowed');
+            return;
+        }
+        
+        if (file.size > maxFileSize) {
+            alert('Image size should be less than 5MB');
+            return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const imageData = e.target.result;
+            addImageToPreview(imageData, container, imageArray);
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+// Update preview function
+function addImageToPreview(imageData, container, imageArray) {
+    const previewItem = document.createElement('div');
+    previewItem.className = 'image-preview-item';
+    
+    const img = document.createElement('img');
+    img.src = imageData;
+    img.style.width = '100%';
+    img.style.height = '100%';
+    img.style.objectFit = 'cover';
+    
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'remove-image';
+    removeBtn.innerHTML = '×';
+    removeBtn.onclick = function() {
+        const index = imageArray.indexOf(imageData);
+        if (index > -1) {
+            imageArray.splice(index, 1);
+        }
+        previewItem.remove();
+    };
+    
+    previewItem.appendChild(img);
+    previewItem.appendChild(removeBtn);
+    container.appendChild(previewItem);
+    
+    // Add to image array
+    imageArray.push(imageData);
+}
+
+// Add event listeners when document loads
+document.addEventListener('DOMContentLoaded', () => {
+    // Add image upload listeners
+    document.getElementById('pinImages').addEventListener('change', function(e) {
+        handleImageUpload(this.files, 'pinImagePreview', currentPinImages);
+    });
+    
+    document.getElementById('editPinImages').addEventListener('change', function(e) {
+        handleImageUpload(this.files, 'editPinImagePreview', currentEditPinImages);
+    });
+    
+    // Add modal click listener
+    document.getElementById('imageModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeImageModal();
+        }
+    });
 });
