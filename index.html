@@ -43,226 +43,94 @@
             backdrop-filter: blur(5px);
         }
 
-        /* Menu Trigger and Categories Panel Styles */
+        /* Menu Styles */
         .menu-trigger {
             position: fixed;
             bottom: 0;
             right: 20px;
             background: #4CAF50;
             color: white;
-            width: 72px;
-            height: 72px;
-            border-radius: 16px 16px 0 0;
+            width: 64px;
+            height: 48px;
+            border-radius: 12px 12px 0 0;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
             z-index: 1001;
-            box-shadow: 0 -4px 12px rgba(76, 175, 80, 0.2);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            font-size: 28px;
+            transition: all 0.2s ease;
+            font-size: 20px;
         }
 
         .menu-trigger:hover {
-            height: 80px;
             background: #43a047;
+            height: 52px;
         }
 
-        .hover-menu {
+        .menu-hover-zone {
             position: fixed;
-            bottom: 72px;
+            bottom: 0;
             right: 20px;
-            background: white;
-            padding: 24px;
-            border-radius: 20px 20px 0 0;
-            box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12);
-            z-index: 1000;
-            width: 360px;
-            max-height: calc(100vh - 180px);
-            overflow-y: auto;
-            transform: translateY(20px);
-            opacity: 0;
-            pointer-events: none;
-            visibility: hidden;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        /* Create a safe hover area between menu trigger and hover menu */
-        .hover-menu::after {
-            content: '';
-            position: absolute;
-            bottom: -20px;
-            left: 0;
-            width: 100%;
+            width: 300px;
             height: 20px;
+            z-index: 999;
             background: transparent;
         }
 
-        .menu-trigger:hover + .hover-menu,
-        .hover-menu:hover {
+        .categories-menu {
+            position: fixed;
+            bottom: 48px;
+            right: 20px;
+            background: white;
+            width: 300px;
+            height: 400px; /* Fixed height */
+            border-radius: 12px 12px 0 0;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            visibility: hidden;
+            transform: translateY(10px);
+            opacity: 0;
+            transition: all 0.2s ease;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .menu-trigger:hover + .menu-hover-zone + .categories-menu,
+        .menu-hover-zone:hover + .categories-menu,
+        .categories-menu:hover {
+            visibility: visible;
             transform: translateY(0);
             opacity: 1;
             pointer-events: all;
-            visibility: visible;
         }
 
-        /* Add a connecting piece between menu and hover menu */
-        .hover-menu::before {
-            content: '';
-            position: absolute;
-            bottom: -72px;
-            right: 0;
-            width: 72px;
-            height: 72px;
-            background: #43a047;
-            z-index: -1;
-        }
-
-        .hover-menu-content {
-            position: relative;
-            z-index: 1;
-        }
-
-        .hover-menu::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        .hover-menu::-webkit-scrollbar-track {
-            background: rgba(0, 0, 0, 0.05);
-            border-radius: 4px;
-        }
-
-        .hover-menu::-webkit-scrollbar-thumb {
-            background: rgba(76, 175, 80, 0.3);
-            border-radius: 4px;
-        }
-
-        .hover-menu::-webkit-scrollbar-thumb:hover {
-            background: rgba(76, 175, 80, 0.5);
-        }
-
-        .hover-menu-content h3 {
-            font-size: 24px;
-            font-weight: 500;
-            color: #1a1a1a;
-            margin-bottom: 20px;
-        }
-
-        .folder-item {
-            background: #f8f9fa;
-            padding: 16px;
-            border-radius: 12px;
-            margin-bottom: 12px;
+        .categories-menu-content {
             display: flex;
-            align-items: center;
-            gap: 12px;
-            transition: all 0.2s ease;
-            border: 1px solid rgba(0, 0, 0, 0.06);
+            flex-direction: column;
+            height: 100%;
         }
 
-        .folder-item:hover {
-            background: #f0f2f5;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        .categories-menu-header {
+            padding: 16px 16px 0 16px;
+            background: white;
+            border-radius: 12px 12px 0 0;
+            border-bottom: 1px solid #eee;
         }
 
-        .folder-color {
-            width: 32px;
-            height: 32px;
-            border-radius: 8px;
-            border: 2px solid white;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            flex-shrink: 0;
-        }
-
-        .folder-name {
-            flex-grow: 1;
-            font-size: 15px;
-            font-weight: 500;
-            color: #2c2c2c;
-        }
-
-        .folder-actions {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-
-        .folder-actions input[type="checkbox"] {
-            width: 18px;
-            height: 18px;
-            margin: 0;
-            cursor: pointer;
-            border-radius: 4px;
-            border: 2px solid #4CAF50;
-            appearance: none;
-            -webkit-appearance: none;
-            position: relative;
-            transition: all 0.2s ease;
-        }
-
-        .folder-actions input[type="checkbox"]:checked {
-            background-color: #4CAF50;
-        }
-
-        .folder-actions input[type="checkbox"]:checked::after {
-            content: '✓';
-            position: absolute;
-            color: white;
-            font-size: 12px;
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%);
-        }
-
-        .action-btn {
-            padding: 8px 12px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 500;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-width: 60px;
-            height: 32px;
-        }
-
-        .action-btn.edit-btn {
-            background: #f0f2f5;
-            color: #2c2c2c;
-        }
-
-        .action-btn.edit-btn:hover {
-            background: #e4e6e9;
-        }
-
-        .action-btn.export-btn {
-            background: #4CAF50;
-            color: white;
-        }
-
-        .action-btn.export-btn:hover {
-            background: #43a047;
-        }
-
-        .action-btn.delete-btn {
-            background: #ef5350;
-            color: white;
-        }
-
-        .action-btn.delete-btn:hover {
-            background: #e53935;
+        .categories-menu-header h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 16px;
         }
 
         .new-category-btn {
             background: #4CAF50;
             color: white;
             border: none;
-            padding: 12px 20px;
-            border-radius: 10px;
+            padding: 10px 16px;
+            border-radius: 8px;
             font-size: 14px;
             font-weight: 500;
             cursor: pointer;
@@ -270,20 +138,65 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
             width: 100%;
             justify-content: center;
         }
 
         .new-category-btn:hover {
             background: #43a047;
-            transform: translateY(-1px);
         }
 
         .new-category-btn::before {
             content: '+';
             font-size: 18px;
             font-weight: 400;
+        }
+
+        .categories-menu-list {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .folder-item {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.2s ease;
+            border: 1px solid #eee;
+        }
+
+        .folder-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .folder-item:hover {
+            background: #f0f2f5;
+        }
+
+        /* Custom scrollbar */
+        .categories-menu-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .categories-menu-list::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 3px;
+            margin: 4px;
+        }
+
+        .categories-menu-list::-webkit-scrollbar-thumb {
+            background: rgba(76, 175, 80, 0.3);
+            border-radius: 3px;
+        }
+
+        .categories-menu-list::-webkit-scrollbar-thumb:hover {
+            background: rgba(76, 175, 80, 0.5);
         }
 
         .pin-form, .folder-form, .edit-pin-form {
@@ -680,11 +593,368 @@
         body.dragging .drag-overlay {
             display: block;
         }
+
+        /* Measurement Styles */
+        .measure-tooltip-wrapper {
+            background: white;
+            border: none;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            padding: 0;
+        }
+
+        .measure-tooltip-wrapper::before {
+            display: none;
+        }
+
+        .measure-tooltip {
+            padding: 8px 12px;
+            text-align: center;
+            font-size: 14px;
+            line-height: 1.4;
+            white-space: nowrap;
+        }
+
+        .measure-tooltip strong {
+            display: block;
+            margin-bottom: 4px;
+            color: #4CAF50;
+        }
+
+        #measureBtn {
+            position: fixed;
+            bottom: 60px;
+            left: 20px;
+            background: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s ease;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #measureBtn::before {
+            content: '📏';
+            font-size: 16px;
+        }
+
+        #measureBtn:hover {
+            background: #f5f5f5;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        #measureBtn.active {
+            background: #4CAF50;
+            color: white;
+        }
+
+        #measureBtn.active:hover {
+            background: #43a047;
+        }
+
+        /* Pin measurement indicator */
+        .pin-measure-indicator {
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 16px;
+            height: 16px;
+            background: rgba(255, 0, 0, 0.3);
+            border: 2px solid rgba(255, 0, 0, 0.6);
+            border-radius: 50%;
+            z-index: -1;
+        }
+
+        .custom-pin {
+            position: relative;
+        }
+
+        .image-upload-container {
+            margin: 15px 0;
+        }
+
+        .image-preview-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .image-preview-item {
+            position: relative;
+            width: 100px;
+            height: 100px;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .image-preview-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .image-preview-item .remove-image {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            color: #dc3545;
+            transition: all 0.2s ease;
+        }
+
+        .image-preview-item .remove-image:hover {
+            background: #dc3545;
+            color: white;
+        }
+
+        .image-upload-btn {
+            background: #e8f5e9;
+            color: #4CAF50;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .image-upload-btn:hover {
+            background: #c8e6c9;
+        }
+
+        .image-upload-btn::before {
+            content: '📷';
+        }
+
+        .pin-images-popup {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 10px;
+            margin: 10px 0;
+            width: 100%;
+        }
+
+        .pin-images-popup img {
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .pin-images-popup img:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        .image-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 2000;
+        }
+
+        .image-modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            max-width: 90vw;
+            max-height: 90vh;
+        }
+
+        .image-modal img {
+            max-width: 100%;
+            max-height: 90vh;
+            object-fit: contain;
+            display: block;
+            margin: 0 auto;
+        }
+
+        .image-modal .nav-button {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            width: 50px;
+            height: 80px;
+            cursor: pointer;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            z-index: 2001;
+        }
+
+        .image-modal .nav-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .image-modal .nav-prev {
+            left: 0;
+        }
+
+        .image-modal .nav-next {
+            right: 0;
+        }
+
+        .image-modal .close-modal {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2001;
+        }
+
+        .image-counter {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            z-index: 2001;
+        }
+
+        .folder-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+
+        .folder-name {
+            flex-grow: 1;
+            font-size: 14px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .folder-actions {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .folder-actions button {
+            padding: 4px 8px;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: white;
+        }
+
+        .folder-actions .edit-btn {
+            background: #2196F3;
+        }
+
+        .folder-actions .edit-btn:hover {
+            background: #1976D2;
+        }
+
+        .folder-actions .export-btn {
+            background: #4CAF50;
+        }
+
+        .folder-actions .export-btn:hover {
+            background: #43A047;
+        }
+
+        .folder-actions .delete-btn {
+            background: #f44336;
+        }
+
+        .folder-actions .delete-btn:hover {
+            background: #d32f2f;
+        }
+
+        .folder-actions button {
+            padding: 4px 8px;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: white;
+        }
+
+        .folder-actions .edit-btn {
+            background: #2196F3;
+        }
+
+        .folder-actions .edit-btn:hover {
+            background: #1976D2;
+        }
+
+        .folder-actions .export-btn {
+            background: #4CAF50;
+        }
+
+        .folder-actions .export-btn:hover {
+            background: #43A047;
+        }
+
+        .folder-actions .delete-btn {
+            background: #f44336;
+        }
+
+        .folder-actions .delete-btn:hover {
+            background: #d32f2f;
+        }
     </style>
 </head>
 <body>
     <div class="drag-overlay"></div>
     <div id="map"></div>
+    <button id="measureBtn" onclick="toggleMeasureMode()">Measure Distance</button>
     <div id="coordinates">Coordinates: [0.000000, 0.000000]</div>
     
     <!-- Command Line Interface -->
@@ -697,11 +967,15 @@
     </div>
 
     <div class="menu-trigger">☰</div>
-    <div class="hover-menu">
-        <div class="hover-menu-content">
-            <h3>Categories</h3>
-            <button class="new-category-btn" onclick="showNewFolderForm()">New Category</button>
-            <div id="folderList"></div>
+    <div class="menu-hover-zone"></div>
+    <div class="categories-menu">
+        <div class="categories-menu-content">
+            <div class="categories-menu-header">
+                <h3>Categories</h3>
+                <button class="new-category-btn" onclick="showNewFolderForm()">New Category</button>
+            </div>
+            <div class="categories-menu-list" id="folderList">
+            </div>
         </div>
     </div>
 
@@ -729,6 +1003,14 @@
             <label>Checklist</label>
             <button onclick="addChecklistItem()" class="add-checklist-btn">Add Item</button>
             <div id="pinChecklist" class="checkbox-list"></div>
+        </div>
+        <div class="form-group">
+            <label>Images</label>
+            <input type="file" id="pinImages" multiple accept="image/*" style="display: none;">
+            <button type="button" class="image-upload-btn" onclick="document.getElementById('pinImages').click()">
+                Add Images
+            </button>
+            <div id="pinImagePreview" class="image-preview-container"></div>
         </div>
         <div class="button-group">
             <button onclick="cancelPin()" class="cancel-btn">Cancel</button>
@@ -777,6 +1059,14 @@
             <button onclick="addEditChecklistItem()" class="add-checklist-btn">Add Item</button>
             <div id="editPinChecklist" class="checkbox-list"></div>
         </div>
+        <div class="form-group">
+            <label>Images</label>
+            <input type="file" id="editPinImages" multiple accept="image/*" style="display: none;">
+            <button type="button" class="image-upload-btn" onclick="document.getElementById('editPinImages').click()">
+                Add Images
+            </button>
+            <div id="editPinImagePreview" class="image-preview-container"></div>
+        </div>
         <div class="button-group">
             <button onclick="updatePin()" class="save-btn">Update</button>
             <button onclick="hideEditPinForm()" class="cancel-btn">Cancel</button>
@@ -804,6 +1094,23 @@
         <div class="button-group">
             <button onclick="handleEditCategory()" class="save-btn">Save</button>
             <button onclick="hideEditCategoryDialog()" class="cancel-btn">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Update the image modal HTML -->
+    <div class="image-modal" id="imageModal">
+        <div class="image-counter" id="imageCounter"></div>
+        <button class="close-modal" onclick="closeImageModal()">×</button>
+        <button class="nav-button nav-prev" onclick="navigateImages(-1)">❮</button>
+        <button class="nav-button nav-next" onclick="navigateImages(1)">❯</button>
+        <div class="image-modal-content" id="imageModalContent">
+            <img id="modalImage" src="" alt="Full size image">
+        </div>
+        <div class="modal-controls">
+            <button onclick="zoomImage(-0.1)" title="Zoom Out">−</button>
+            <div class="zoom-level" id="zoomLevel">100%</div>
+            <button onclick="zoomImage(0.1)" title="Zoom In">+</button>
+            <button onclick="resetZoom()" title="Reset Zoom">↺</button>
         </div>
     </div>
 
