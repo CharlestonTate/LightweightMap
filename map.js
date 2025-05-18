@@ -1325,9 +1325,13 @@ function calculateDistance(latlng1, latlng2) {
     // Convert to miles (1 mile = 5280 feet)
     const miles = feet / 5280;
     
+    // Calculate approximate steps (average 2,000 steps per mile)
+    const steps = Math.round(miles * 2000);
+    
     return {
         feet: Math.round(feet),
-        miles: miles.toFixed(2)
+        miles: miles.toFixed(2),
+        steps: steps
     };
 }
 
@@ -1356,7 +1360,8 @@ function updateMeasurementLine(startPin, endPin) {
         <div class="measure-tooltip">
             <strong>Distance:</strong><br>
             ${distance.feet.toLocaleString()} ft<br>
-            ${distance.miles} mi
+            ${distance.miles} mi<br>
+            ~${distance.steps.toLocaleString()} steps
         </div>
     `;
     
@@ -1388,59 +1393,44 @@ function navigateImages(direction) {
     counter.textContent = `${currentImageIndex + 1} / ${currentImageSet.length}`;
 }
 
-// Update image upload handling
-function handleImageUpload(files, previewContainerId, imageArray) {
-    const container = document.getElementById(previewContainerId);
-    const maxFileSize = 5 * 1024 * 1024; // 5MB limit
+// Handle image upload
+async function handleImageUpload(files, previewContainerId, imagesArray) {
+    const previewContainer = document.getElementById(previewContainerId);
     
-    Array.from(files).forEach(file => {
-        if (!file.type.startsWith('image/')) {
-            alert('Only image files are allowed');
-            return;
-        }
+    try {
+        // Upload images to Imgur
+        const imgurUrls = await uploadMultipleImages(files);
         
-        if (file.size > maxFileSize) {
-            alert('Image size should be less than 5MB');
-            return;
-        }
+        // Add URLs to the images array
+        imagesArray.push(...imgurUrls);
         
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const imageData = e.target.result;
-            addImageToPreview(imageData, container, imageArray);
-        };
-        reader.readAsDataURL(file);
-    });
-}
-
-// Update preview function
-function addImageToPreview(imageData, container, imageArray) {
-    const previewItem = document.createElement('div');
-    previewItem.className = 'image-preview-item';
-    
-    const img = document.createElement('img');
-    img.src = imageData;
-    img.style.width = '100%';
-    img.style.height = '100%';
-    img.style.objectFit = 'cover';
-    
-    const removeBtn = document.createElement('button');
-    removeBtn.className = 'remove-image';
-    removeBtn.innerHTML = '×';
-    removeBtn.onclick = function() {
-        const index = imageArray.indexOf(imageData);
-        if (index > -1) {
-            imageArray.splice(index, 1);
-        }
-        previewItem.remove();
-    };
-    
-    previewItem.appendChild(img);
-    previewItem.appendChild(removeBtn);
-    container.appendChild(previewItem);
-    
-    // Add to image array
-    imageArray.push(imageData);
+        // Create preview elements
+        imgurUrls.forEach(imageUrl => {
+            const previewItem = document.createElement('div');
+            previewItem.className = 'image-preview-item';
+            
+            const img = document.createElement('img');
+            img.src = imageUrl;
+            
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'remove-image';
+            removeBtn.innerHTML = '×';
+            removeBtn.onclick = function() {
+                const index = imagesArray.indexOf(imageUrl);
+                if (index > -1) {
+                    imagesArray.splice(index, 1);
+                }
+                previewItem.remove();
+            };
+            
+            previewItem.appendChild(img);
+            previewItem.appendChild(removeBtn);
+            previewContainer.appendChild(previewItem);
+        });
+    } catch (error) {
+        console.error('Error handling image upload:', error);
+        alert('Failed to upload one or more images. Please try again.');
+    }
 }
 
 // Add event listeners when document loads
